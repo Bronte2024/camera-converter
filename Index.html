@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Camera Currency Converter</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding: 20px; }
+    video, canvas { width: 100%; max-width: 300px; margin: 10px 0; }
+    button { padding: 10px 20px; font-size: 16px; }
+    #output { font-size: 18px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h1>Camera Currency Converter</h1>
+
+  <video id="video" autoplay playsinline></video>
+  <br>
+  <button id="snap">Take Snapshot</button>
+  <canvas id="canvas" style="display:none;"></canvas>
+
+  <div id="output">Detected Price: <span id="price">-</span> <br> Converted Price: <span id="converted">-</span></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const snapButton = document.getElementById('snap');
+    const priceOutput = document.getElementById('price');
+    const convertedOutput = document.getElementById('converted');
+
+    const targetCurrency = 'THB'; // Change this to your target currency
+    const exchangeAPIKey = 'https://v6.exchangerate-api.com/v6/64cbf97dcfc9fd0a924f922f/'; // Replace with your free API key
+
+    // 1️⃣ Start Camera
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      .then(stream => { video.srcObject = stream; })
+      .catch(err => alert('Camera access denied.'));
+
+    // 2️⃣ Take Snapshot
+    snapButton.addEventListener('click', () => {
+      const context = canvas.getContext('2d');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // 3️⃣ Extract Text with Tesseract
+      Tesseract.recognize(canvas, 'eng')
+        .then(result => {
+          const text = result.data.text;
+          console.log('OCR Result:', text);
+          const priceMatch = text.match(/[\d,.]+/);
+          if (priceMatch) {
+            const price = parseFloat(priceMatch[0].replace(/,/g, ''));
+            priceOutput.textContent = price;
+            fetchExchangeRateAndConvert(price);
+          } else {
+            priceOutput.textContent = 'Not detected';
+            convertedOutput.textContent = '-';
+          }
+        });
+    });
+
+    // 4️⃣ Convert Price
+    function fetchExchangeRateAndConvert(price) {
+      fetch(`https://v6.exchangerate-api.com/v6/${exchangeAPIKey}/latest/USD`)
+        .then(response => response.json())
+        .then(data => {
+          const rate = data.conversion_rates[targetCurrency];
+          const converted = (price * rate).toFixed(2);
+          convertedOutput.textContent = `${converted} ${targetCurrency}`;
+        })
+        .catch(err => {
+          alert('Error fetching exchange rates.');
+          console.error(err);
+        });
+    }
+  </script>
+</body>
+</html>
